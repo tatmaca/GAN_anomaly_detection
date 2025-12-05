@@ -689,6 +689,8 @@ if __name__ == "__main__":
     ax1 = sns.kdeplot(
         dis_ret["return"].values, linestyle="--", fill=True, label="discrimatedRtn"
     )
+    print("PRINTING DISCRIMINATED RETURNS")
+    print(dis_ret["return"].values)
     ax2 = sns.kdeplot(ret, label="realRtn")
     plt.legend()
     plt.savefig(out_path, dpi=300, bbox_inches="tight")
