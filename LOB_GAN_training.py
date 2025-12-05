@@ -5,6 +5,7 @@ Created on Wed October 8 09:40:23 2025
 @author: hongs; adapted from the orignal copy by Mr. GUAN Chenjiong, 2025.
 """
 
+import argparse
 import os
 import random
 
@@ -178,11 +179,18 @@ def get_verge(x, y):
 
 
 if __name__ == "__main__":
+    # adding a parser to more easily train different stocks
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--stock", type=str, required=True, help="stock symbol to train GAN"
+    )
+    args = parser.parse_args()
+
     ###Prepare common directory
     stockDataDir = "data/"
 
     ###Prepare stock list
-    stock = "0056"
+    stock = args.stock
 
     cols = [
         "date",
@@ -849,17 +857,27 @@ if __name__ == "__main__":
                 ):
                     break
 
+        # dir definition
+        out_dir = f"data_{stock}"
+        os.makedirs(out_dir, exist_ok=True)
+
+        # file paths
+        train_path = os.path.join(out_dir, f"{stock}_train_g_d.csv")
+        eval_path = os.path.join(out_dir, f"{stock}_eval_g_d.csv")
+        gen_path = os.path.join(out_dir, f"{stock}_generator1.pth")
+        disc_path = os.path.join(out_dir, f"{stock}_discriminator1.pth")
+
         # persist training results on training data
         pd.DataFrame([train_g_loss, train_d_loss], index=["train_g", "train_d"]).to_csv(
-            stock + "_train_g_d.csv"
+            train_path
         )
         # persist validation results on validation data
         pd.DataFrame([eval_g_loss, eval_d_loss], index=["eval_g", "eval_d"]).to_csv(
-            stock + "_eval_g_d.csv"
+            eval_path
         )
 
         # persist the model
-        torch.save(generator, stock + "_generator1.pth")
-        torch.save(discriminator, stock + "_discriminator1.pth")
+        torch.save(generator, gen_path)
+        torch.save(discriminator, disc_path)
 
         print("Done training LOB_GAN for stock " + stock)
