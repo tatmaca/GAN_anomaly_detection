@@ -184,6 +184,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--stock", type=str, required=True, help="stock symbol to train GAN"
     )
+
+    parser.add_argument(
+        "--lrg", type=float, default=0.00375, help="learning rate for generator"
+    )
+
+    parser.add_argument(
+        "--lrd", type=float, default=0.001, help="learning rate for discriminator"
+    )
+
     args = parser.parse_args()
 
     ###Prepare common directory
@@ -191,6 +200,8 @@ if __name__ == "__main__":
 
     ###Prepare stock list
     stock = args.stock
+    lrg = args.lrg
+    lrd = args.lrd
 
     cols = [
         "date",
@@ -614,10 +625,10 @@ if __name__ == "__main__":
 
         # params
         optimizer_G = torch.optim.Adam(
-            generator.parameters(), lr=0.00375, betas=(0.99, 0.999)
+            generator.parameters(), lr=lrg, betas=(0.99, 0.999)
         )
         optimizer_D = torch.optim.Adam(
-            discriminator.parameters(), lr=0.001, betas=(0.99, 0.999)
+            discriminator.parameters(), lr=lrd, betas=(0.99, 0.999)
         )
 
         # batch size
