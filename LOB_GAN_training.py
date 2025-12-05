@@ -4,6 +4,14 @@ Created on Wed October 8 09:40:23 2025
 
 @author: hongs; adapted from the orignal copy by Mr. GUAN Chenjiong, 2025.
 """
+# import sys, platform
+
+# print(">>> DEBUG from LOB_GAN_training.py")
+# print("sys.executable:", sys.executable)
+# print("platform:", platform.system(), platform.machine())
+# print("sys.path[0]:", sys.path[0])
+# print("<<< END DEBUG\n")
+
 
 import argparse
 import os

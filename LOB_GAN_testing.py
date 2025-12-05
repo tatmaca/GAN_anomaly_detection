@@ -565,6 +565,8 @@ if __name__ == "__main__":
     else:
         minutelyData = prepareMinutelyData(df, tradingDays)
         print("Minutely data generated.")
+    print(f'minute by minute data columns: {minutelyData.columns}')
+    print(minutelyData)
 
     projdata = []
     columns = [
@@ -595,11 +597,27 @@ if __name__ == "__main__":
         "BV5",
     ]
 
-    for x in minutelyData.groupby("date"):
-        if x[1].shape[0] == 265:
-            projdata.append(x[1].values)
+    minutelyData = minutelyData.reset_index()
+    # print(f"MINUTE DATA : {minutelyData}")
+
+    # for x in minutelyData.set_index('dt_index').groupby("date"):
+    #     if x[1].shape[0] == 265:
+    #         projdata.append(x[1].values)
+
+    # projdata = np.array(projdata)
+    seq_dt_index = []  # one dt_index per sequence/day
+
+    md = minutelyData.set_index('dt_index')
+
+    for date, df_day in md.groupby("date"):
+        if df_day.shape[0] == 265:
+            projdata.append(df_day[columns].values)  # as before
+            # choose which dt_index to represent this day; here we use the last bar
+            seq_dt_index.append(df_day.index[-1])
 
     projdata = np.array(projdata)
+    seq_dt_index = np.array(seq_dt_index)
+
 
     # normalization
     X = projdata[:, :, 5:].astype(float)
@@ -642,10 +660,21 @@ if __name__ == "__main__":
     test_dataloader = DataLoader(dataset=test_dataset, batch_size=1, shuffle=False)
     test_data = projdata[:, :, :]
 
+
     # daily returns
-    price = test_data[:, :, [0, 2, -1]]
-    price = pd.DataFrame(price.reshape((-1, 3)))
-    price.columns = ["date", "price", "index"]
+    # price = test_data[:, :, [0, 2, -1]]
+    # price = pd.DataFrame(price.reshape((-1, 3)))
+    # price.columns = ["date", "price", "index"]
+
+    price = (
+    minutelyData
+    .reset_index()[["date", "lastPx", "dt_index"]]   # dt_index comes from the index
+    .rename(columns={"lastPx": "price", "dt_index": "index"})
+    )
+
+    print(f'price {price.head()}')
+    print(f'test_dataset: {test_dataset}')
+    #print(f'test_data: {test_data.head()}')
 
     def get_return(x):
         return x.iloc[-1] / x.iloc[0] - 1
@@ -662,7 +691,7 @@ if __name__ == "__main__":
     for i, data in enumerate(test_dataloader):
         if discriminator(data) <= 0.5:
             # counter += 1
-            index = test_data[i, 0, -1]
+            index = seq_dt_index[i]
 
             today_return = test_data[i, -1, 2] / test_data[i, 0, 2] - 1
             dis_ret_list.append(today_return)
@@ -678,10 +707,29 @@ if __name__ == "__main__":
 
         genLOBData = pd.DataFrame(generator(data).detach().numpy()[0])
 
-    dis_ret = pd.DataFrame()
-    dis_ret.index = dis_index_list
-    dis_ret["return"] = dis_ret_list
-    dis_ret["tomorrow_return"] = dis_tomoret_list
+    # dis_ret = pd.DataFrame()
+    # dis_ret.index = dis_index_list
+    # dis_ret["return"] = dis_ret_list
+    # dis_ret["tomorrow_return"] = dis_tomoret_list
+
+    dis_ret = pd.DataFrame({
+    "return": dis_ret_list,
+    "tomorrow_return": dis_tomoret_list,
+    }, index=pd.to_datetime(dis_index_list))    
+
+
+
+    print(f"MINUTELY DATA INDEX TYPE: {minutelyData['dt_index'].dtype}")
+    print(f"MINUTELY DATA INDEX: {minutelyData['dt_index']}")
+    print(f'DIS RET INDEX TYPE: {dis_ret.index.dtype}')
+    print(f'DIS RET INDEX: {dis_ret.index}')
+
+    merged = minutelyData.merge(dis_ret, left_on='dt_index', right_index=True, how="inner")
+    unmerged = minutelyData[~minutelyData['dt_index'].isin(dis_ret.index)]
+
+    print(f'merged: {merged}')
+    print(f'unmerged: {unmerged}')
+
 
     model_dir = f"data_{stock}"
     out_path = f"{model_dir}/{stock}_return.png"
