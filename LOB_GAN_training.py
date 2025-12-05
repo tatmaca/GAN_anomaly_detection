@@ -9,8 +9,10 @@ import argparse
 import os
 import random
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset, random_split
@@ -890,5 +892,32 @@ if __name__ == "__main__":
         # persist the model
         torch.save(generator, gen_path)
         torch.save(discriminator, disc_path)
+
+        # --- plot losses ---
+        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+        # Training loss plot
+        axes[0].plot(train_g_loss, label="Generator Loss", color="blue")
+        axes[0].plot(train_d_loss, label="Discriminator Loss", color="orange")
+        axes[0].set_title("Training Loss")
+        axes[0].set_xlabel("Epoch")
+        axes[0].set_ylabel("Loss")
+        axes[0].legend()
+        axes[0].grid(True)
+
+        # Validation loss plot
+        axes[1].plot(eval_g_loss, label="Generator Loss", color="blue")
+        axes[1].plot(eval_d_loss, label="Discriminator Loss", color="orange")
+        axes[1].set_title("Validation Loss")
+        axes[1].set_xlabel("Epoch")
+        axes[1].set_ylabel("Loss")
+        axes[1].legend()
+        axes[1].grid(True)
+
+        # Save figure
+        loss_plot_path = os.path.join(out_dir, f"{stock}_loss_plot.png")
+        plt.tight_layout()
+        plt.savefig(loss_plot_path, dpi=300, bbox_inches="tight")
+        plt.close()
 
         print("Done training LOB_GAN for stock " + stock)
