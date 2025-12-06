@@ -98,6 +98,262 @@ class MyDataset(Dataset):
         return len(self.data)
 
 
+def runOptimizer(lrg, lrd, beta1, X, save_flag=True, epochs=75):
+    # set up
+    set_seed(307)
+
+    generator = Generator()
+    discriminator = Discriminator()
+
+    # params
+    optimizer_G = torch.optim.Adam(generator.parameters(), lr=lrg, betas=(beta1, 0.999))
+    optimizer_D = torch.optim.Adam(
+        discriminator.parameters(), lr=lrd, betas=(beta1, 0.999)
+    )
+
+    # batch size
+    batch_size = 50
+    dataset = MyDataset(torch.tensor(X, dtype=torch.float32))
+
+    # training, validation, testing
+    train_size = int(0.8 * len(dataset))
+    eval_size = int(0.2 * len(dataset))
+    train_dataset, eval_dataset = random_split(
+        dataset[: train_size + eval_size], [train_size, eval_size]
+    )
+
+    # dataloaders
+    train_dataloader = DataLoader(
+        dataset=train_dataset, batch_size=batch_size, shuffle=True
+    )
+    eval_dataloader = DataLoader(
+        dataset=eval_dataset, batch_size=batch_size, shuffle=True
+    )
+
+    # loss functions
+    gen_loss = torch.nn.BCELoss()
+    loss_function = torch.nn.MSELoss()
+
+    # storage of loss data
+    train_g_loss = []  #
+    train_d_loss = []  #
+    eval_g_loss = []  #
+    eval_d_loss = []  #
+
+    train_verge = []  # early stopping
+    eval_verge = []  # early stopping
+
+    # training starts here
+    for epoch in range(epochs):
+        for i, data in enumerate(train_dataloader):
+
+            # real vs noise
+            real = torch.ones(data.size(0), 1)
+            fake = torch.zeros(data.size(0), 1)
+
+            # train the generator
+            generator.train()
+            optimizer_G.zero_grad()
+
+            gen = generator(data)
+
+            d_data = data[:, 1:, :] - data[:, :-1, :]
+            d_gen = gen[:, 1:, :] - gen[:, :-1, :]
+            dd_data = d_data[:, 1:, :] - d_data[:, :-1, :]
+            dd_gen = d_gen[:, 1:, :] - d_gen[:, :-1, :]
+
+            g_loss = (
+                loss_function(discriminator(gen), real)
+                + loss_function(
+                    torch.mean(torch.abs(data), axis=1),
+                    torch.mean(torch.abs(gen), axis=1),
+                )
+                + loss_function(torch.mean(data, axis=1), torch.mean(gen, axis=1))
+                + loss_function(torch.mean(data**2, axis=1), torch.mean(gen**2, axis=1))
+                + loss_function(torch.mean(data**3, axis=1), torch.mean(gen**3, axis=1))
+                + loss_function(
+                    torch.mean(torch.abs(d_data), axis=1),
+                    torch.mean(torch.abs(d_gen), axis=1),
+                )
+                + loss_function(torch.mean(d_data, axis=1), torch.mean(d_gen, axis=1))
+                + loss_function(
+                    torch.mean(d_data**2, axis=1), torch.mean(d_gen**2, axis=1)
+                )
+                + loss_function(
+                    torch.mean(d_data**3, axis=1), torch.mean(d_gen**3, axis=1)
+                )
+                + loss_function(
+                    torch.mean(torch.abs(dd_data), axis=1),
+                    torch.mean(torch.abs(dd_gen), axis=1),
+                )
+                + loss_function(torch.mean(dd_data, axis=1), torch.mean(dd_gen, axis=1))
+                + loss_function(
+                    torch.mean(dd_data**2, axis=1), torch.mean(dd_gen**2, axis=1)
+                )
+                + loss_function(
+                    torch.mean(dd_data**3, axis=1), torch.mean(dd_gen**3, axis=1)
+                )
+            )
+
+            g_loss.backward()
+            torch.nn.utils.clip_grad_norm_(
+                generator.parameters(), 0.3
+            )  # clipping the gradient
+            optimizer_G.step()
+
+            # train the discriminator
+            discriminator.train()
+            optimizer_D.zero_grad()
+
+            real_loss = loss_function(discriminator(data), real)
+            fake_loss = loss_function(discriminator(gen.detach()), fake)
+            d_loss = (real_loss + fake_loss) / 2
+
+            d_loss.backward()
+            torch.nn.utils.clip_grad_norm_(
+                discriminator.parameters(), 0.1
+            )  # clipping the gradient
+            optimizer_D.step()
+
+            train_g_loss.append(g_loss.item())
+            train_d_loss.append(d_loss.item())
+
+            if i % 10 == 0:
+                print(
+                    "[Epoch %d/%d][Batch %d/%d][D train loss: %f][G train loss: %f]"
+                    % (
+                        epoch + 1,
+                        epochs,
+                        i + 1,
+                        len(train_dataloader),
+                        d_loss.item(),
+                        g_loss.item(),
+                    )
+                )
+
+        # validation data set
+        g_loss_total = 0
+        d_loss_total = 0
+        for i, data in enumerate(eval_dataloader):
+
+            # real vs. noise
+            real = torch.ones(data.size(0), 1)
+            fake = torch.zeros(data.size(0), 1)
+
+            # evaluate the generator
+            generator.eval()
+
+            gen = generator(data)
+
+            d_data = data[:, 1:, :] - data[:, :-1, :]
+            d_gen = gen[:, 1:, :] - gen[:, :-1, :]
+            dd_data = d_data[:, 1:, :] - d_data[:, :-1, :]
+            dd_gen = d_gen[:, 1:, :] - d_gen[:, :-1, :]
+
+            g_loss = (
+                loss_function(discriminator(gen), real)
+                + loss_function(
+                    torch.mean(torch.abs(data), axis=1),
+                    torch.mean(torch.abs(gen), axis=1),
+                )
+                + loss_function(torch.mean(data, axis=1), torch.mean(gen, axis=1))
+                + loss_function(torch.mean(data**2, axis=1), torch.mean(gen**2, axis=1))
+                + loss_function(torch.mean(data**3, axis=1), torch.mean(gen**3, axis=1))
+                + loss_function(
+                    torch.mean(torch.abs(d_data), axis=1),
+                    torch.mean(torch.abs(d_gen), axis=1),
+                )
+                + loss_function(torch.mean(d_data, axis=1), torch.mean(d_gen, axis=1))
+                + loss_function(
+                    torch.mean(d_data**2, axis=1), torch.mean(d_gen**2, axis=1)
+                )
+                + loss_function(
+                    torch.mean(d_data**3, axis=1), torch.mean(d_gen**3, axis=1)
+                )
+                + loss_function(
+                    torch.mean(torch.abs(dd_data), axis=1),
+                    torch.mean(torch.abs(dd_gen), axis=1),
+                )
+                + loss_function(torch.mean(dd_data, axis=1), torch.mean(dd_gen, axis=1))
+                + loss_function(
+                    torch.mean(dd_data**2, axis=1), torch.mean(dd_gen**2, axis=1)
+                )
+                + loss_function(
+                    torch.mean(dd_data**3, axis=1), torch.mean(dd_gen**3, axis=1)
+                )
+            )
+            g_loss_total += g_loss
+
+            # evaluate the discriminator
+            discriminator.eval()
+
+            real_loss = loss_function(discriminator(data), real)
+            fake_loss = loss_function(discriminator(gen.detach()), fake)
+            d_loss = (real_loss + fake_loss) / 2
+            d_loss_total += d_loss
+
+            eval_g_loss.append(g_loss.item())
+            eval_d_loss.append(d_loss.item())
+
+        print(
+            "[Epoch %d/%d][Batch %d/%d][D eval loss: %f][G eval loss: %f]"
+            % (
+                epoch + 1,
+                epochs,
+                i + 1,
+                len(eval_dataloader),
+                d_loss_total.item() / len(eval_dataloader),
+                g_loss_total.item() / len(eval_dataloader),
+            )
+        )
+
+        train_verge.append(
+            get_verge(
+                train_g_loss[-len(train_dataloader) :],
+                train_d_loss[-len(train_dataloader) :],
+            )
+        )
+        eval_verge.append(
+            get_verge(
+                eval_g_loss[-len(eval_dataloader) :],
+                eval_d_loss[-len(eval_dataloader) :],
+            )
+        )
+
+        if epoch >= 5:
+            # early stop
+            if (
+                train_verge[-3] > train_verge[-2]
+                and train_verge[-2] > train_verge[-1]
+                and eval_verge[-3] < eval_verge[-2]
+                and eval_verge[-2] < eval_verge[-1]
+            ):
+                break
+
+    last_eval_g = eval_g_loss[-len(eval_dataloader) :]
+    last_eval_d = eval_d_loss[-len(eval_dataloader) :]
+
+    final_g_error = float(torch.tensor(last_eval_g).mean())
+    final_d_error = float(torch.tensor(last_eval_d).mean())
+    total_error = final_g_error + final_d_error
+
+    if save_flag:
+        return {
+            "generator": generator,
+            "discriminator": discriminator,
+            "train_g_loss": train_g_loss,
+            "train_d_loss": train_d_loss,
+            "eval_g_loss": eval_g_loss,
+            "eval_d_loss": eval_d_loss,
+        }
+    else:
+        return {
+            "G": final_g_error,
+            "D": final_d_error,
+            "total": total_error,
+        }
+
+
 def prepareMinutelyData(df: pd.DataFrame, tradingDays: list):
     if df.empty:
         return None
@@ -188,22 +444,36 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--lrg", type=float, default=0.00375, help="learning rate for generator"
+        "--lrg_u", type=float, default=0.0375, help="learning rate for generator"
     )
 
     parser.add_argument(
-        "--lrd", type=float, default=0.001, help="learning rate for discriminator"
+        "--lrg_d", type=float, default=0.00375, help="learning rate for generator"
+    )
+
+    parser.add_argument(
+        "--lrd_u", type=float, default=0.01, help="learning rate for discriminator"
+    )
+
+    parser.add_argument(
+        "--lrd_d", type=float, default=0.001, help="learning rate for discriminator"
+    )
+
+    parser.add_argument(
+        "--beta1", type=float, default=0.9, help="beta1 rate for LOBGAN"
     )
 
     args = parser.parse_args()
+
+    lrgs = np.linspace(args.lrg_d, args.lrg_u, 1)
+    lrds = np.linspace(args.lrd_d, args.lrd_u, 1)
+    beta1 = args.beta1
 
     ###Prepare common directory
     stockDataDir = "data/"
 
     ###Prepare stock list
     stock = args.stock
-    lrg = args.lrg
-    lrd = args.lrd
 
     cols = [
         "date",
@@ -619,260 +889,58 @@ if __name__ == "__main__":
         X = np.transpose((np.transpose(X, (1, 0, 2)) - X_mean) / (2 * X_std), (1, 0, 2))
         X = np.nan_to_num(X, nan=0, posinf=0, neginf=0)
 
-        # set up
-        set_seed(307)
+        results = {}
 
-        generator = Generator()
-        discriminator = Discriminator()
+        for lrg in lrgs:
+            for lrd in lrds:
+                print(f"Running (lrg={lrg}, lrd={lrd})")
 
-        # params
-        optimizer_G = torch.optim.Adam(
-            generator.parameters(), lr=lrg, betas=(0.99, 0.999)
-        )
-        optimizer_D = torch.optim.Adam(
-            discriminator.parameters(), lr=lrd, betas=(0.99, 0.999)
-        )
+                out = runOptimizer(lrg, lrd, beta1, X, save_flag=False)
 
-        # batch size
-        batch_size = 50
-        dataset = MyDataset(torch.tensor(X, dtype=torch.float32))
+                results[(lrg, lrd)] = out
 
-        # training, validation, testing
-        train_size = int(0.8 * len(dataset))
-        eval_size = int(0.2 * len(dataset))
-        train_dataset, eval_dataset = random_split(
-            dataset[: train_size + eval_size], [train_size, eval_size]
-        )
+                print(f"Finished (lrg={lrg}, lrd={lrd}) -> total={out['total']}")
 
-        # dataloaders
-        train_dataloader = DataLoader(
-            dataset=train_dataset, batch_size=batch_size, shuffle=True
-        )
-        eval_dataloader = DataLoader(
-            dataset=eval_dataset, batch_size=batch_size, shuffle=True
+        # --- Build loss matrix ---
+        loss_matrix = np.zeros((len(lrgs), len(lrds)))
+
+        for i, lrg in enumerate(lrgs):
+            for j, lrd in enumerate(lrds):
+                loss_matrix[i, j] = results[(lrg, lrd)]["total"]
+
+        # Create a labeled DataFrame
+        loss_df = pd.DataFrame(
+            loss_matrix,
+            index=[f"G={lr:.6f}" for lr in lrgs],
+            columns=[f"D={lr:.6f}" for lr in lrds],
         )
 
-        # loss functions
-        gen_loss = torch.nn.BCELoss()
-        loss_function = torch.nn.MSELoss()
-
-        epochs = 200
-
-        # storage of loss data
-        train_g_loss = []  #
-        train_d_loss = []  #
-        eval_g_loss = []  #
-        eval_d_loss = []  #
-
-        train_verge = []  # early stopping
-        eval_verge = []  # early stopping
-
-        # training starts here
-        for epoch in range(epochs):
-            for i, data in enumerate(train_dataloader):
-
-                # real vs noise
-                real = torch.ones(data.size(0), 1)
-                fake = torch.zeros(data.size(0), 1)
-
-                # train the generator
-                generator.train()
-                optimizer_G.zero_grad()
-
-                gen = generator(data)
-
-                d_data = data[:, 1:, :] - data[:, :-1, :]
-                d_gen = gen[:, 1:, :] - gen[:, :-1, :]
-                dd_data = d_data[:, 1:, :] - d_data[:, :-1, :]
-                dd_gen = d_gen[:, 1:, :] - d_gen[:, :-1, :]
-
-                g_loss = (
-                    loss_function(discriminator(gen), real)
-                    + loss_function(
-                        torch.mean(torch.abs(data), axis=1),
-                        torch.mean(torch.abs(gen), axis=1),
-                    )
-                    + loss_function(torch.mean(data, axis=1), torch.mean(gen, axis=1))
-                    + loss_function(
-                        torch.mean(data**2, axis=1), torch.mean(gen**2, axis=1)
-                    )
-                    + loss_function(
-                        torch.mean(data**3, axis=1), torch.mean(gen**3, axis=1)
-                    )
-                    + loss_function(
-                        torch.mean(torch.abs(d_data), axis=1),
-                        torch.mean(torch.abs(d_gen), axis=1),
-                    )
-                    + loss_function(
-                        torch.mean(d_data, axis=1), torch.mean(d_gen, axis=1)
-                    )
-                    + loss_function(
-                        torch.mean(d_data**2, axis=1), torch.mean(d_gen**2, axis=1)
-                    )
-                    + loss_function(
-                        torch.mean(d_data**3, axis=1), torch.mean(d_gen**3, axis=1)
-                    )
-                    + loss_function(
-                        torch.mean(torch.abs(dd_data), axis=1),
-                        torch.mean(torch.abs(dd_gen), axis=1),
-                    )
-                    + loss_function(
-                        torch.mean(dd_data, axis=1), torch.mean(dd_gen, axis=1)
-                    )
-                    + loss_function(
-                        torch.mean(dd_data**2, axis=1), torch.mean(dd_gen**2, axis=1)
-                    )
-                    + loss_function(
-                        torch.mean(dd_data**3, axis=1), torch.mean(dd_gen**3, axis=1)
-                    )
-                )
-
-                g_loss.backward()
-                torch.nn.utils.clip_grad_norm_(
-                    generator.parameters(), 0.3
-                )  # clipping the gradient
-                optimizer_G.step()
-
-                # train the discriminator
-                discriminator.train()
-                optimizer_D.zero_grad()
-
-                real_loss = loss_function(discriminator(data), real)
-                fake_loss = loss_function(discriminator(gen.detach()), fake)
-                d_loss = (real_loss + fake_loss) / 2
-
-                d_loss.backward()
-                torch.nn.utils.clip_grad_norm_(
-                    discriminator.parameters(), 0.1
-                )  # clipping the gradient
-                optimizer_D.step()
-
-                train_g_loss.append(g_loss.item())
-                train_d_loss.append(d_loss.item())
-
-                if i % 10 == 0:
-                    print(
-                        "[Epoch %d/%d][Batch %d/%d][D train loss: %f][G train loss: %f]"
-                        % (
-                            epoch + 1,
-                            epochs,
-                            i + 1,
-                            len(train_dataloader),
-                            d_loss.item(),
-                            g_loss.item(),
-                        )
-                    )
-
-            # validation data set
-            g_loss_total = 0
-            d_loss_total = 0
-            for i, data in enumerate(eval_dataloader):
-
-                # real vs. noise
-                real = torch.ones(data.size(0), 1)
-                fake = torch.zeros(data.size(0), 1)
-
-                # evaluate the generator
-                generator.eval()
-
-                gen = generator(data)
-
-                d_data = data[:, 1:, :] - data[:, :-1, :]
-                d_gen = gen[:, 1:, :] - gen[:, :-1, :]
-                dd_data = d_data[:, 1:, :] - d_data[:, :-1, :]
-                dd_gen = d_gen[:, 1:, :] - d_gen[:, :-1, :]
-
-                g_loss = (
-                    loss_function(discriminator(gen), real)
-                    + loss_function(
-                        torch.mean(torch.abs(data), axis=1),
-                        torch.mean(torch.abs(gen), axis=1),
-                    )
-                    + loss_function(torch.mean(data, axis=1), torch.mean(gen, axis=1))
-                    + loss_function(
-                        torch.mean(data**2, axis=1), torch.mean(gen**2, axis=1)
-                    )
-                    + loss_function(
-                        torch.mean(data**3, axis=1), torch.mean(gen**3, axis=1)
-                    )
-                    + loss_function(
-                        torch.mean(torch.abs(d_data), axis=1),
-                        torch.mean(torch.abs(d_gen), axis=1),
-                    )
-                    + loss_function(
-                        torch.mean(d_data, axis=1), torch.mean(d_gen, axis=1)
-                    )
-                    + loss_function(
-                        torch.mean(d_data**2, axis=1), torch.mean(d_gen**2, axis=1)
-                    )
-                    + loss_function(
-                        torch.mean(d_data**3, axis=1), torch.mean(d_gen**3, axis=1)
-                    )
-                    + loss_function(
-                        torch.mean(torch.abs(dd_data), axis=1),
-                        torch.mean(torch.abs(dd_gen), axis=1),
-                    )
-                    + loss_function(
-                        torch.mean(dd_data, axis=1), torch.mean(dd_gen, axis=1)
-                    )
-                    + loss_function(
-                        torch.mean(dd_data**2, axis=1), torch.mean(dd_gen**2, axis=1)
-                    )
-                    + loss_function(
-                        torch.mean(dd_data**3, axis=1), torch.mean(dd_gen**3, axis=1)
-                    )
-                )
-                g_loss_total += g_loss
-
-                # evaluate the discriminator
-                discriminator.eval()
-
-                real_loss = loss_function(discriminator(data), real)
-                fake_loss = loss_function(discriminator(gen.detach()), fake)
-                d_loss = (real_loss + fake_loss) / 2
-                d_loss_total += d_loss
-
-                eval_g_loss.append(g_loss.item())
-                eval_d_loss.append(d_loss.item())
-
-            print(
-                "[Epoch %d/%d][Batch %d/%d][D eval loss: %f][G eval loss: %f]"
-                % (
-                    epoch + 1,
-                    epochs,
-                    i + 1,
-                    len(eval_dataloader),
-                    d_loss_total.item() / len(eval_dataloader),
-                    g_loss_total.item() / len(eval_dataloader),
-                )
-            )
-
-            train_verge.append(
-                get_verge(
-                    train_g_loss[-len(train_dataloader) :],
-                    train_d_loss[-len(train_dataloader) :],
-                )
-            )
-            eval_verge.append(
-                get_verge(
-                    eval_g_loss[-len(eval_dataloader) :],
-                    eval_d_loss[-len(eval_dataloader) :],
-                )
-            )
-
-            if epoch >= 5:
-                # early stop
-                if (
-                    train_verge[-3] > train_verge[-2]
-                    and train_verge[-2] > train_verge[-1]
-                    and eval_verge[-3] < eval_verge[-2]
-                    and eval_verge[-2] < eval_verge[-1]
-                ):
-                    break
+        print("\nCombined validation loss matrix:")
+        print(loss_df.to_string())
 
         # dir definition
         out_dir = f"data_{stock}"
         os.makedirs(out_dir, exist_ok=True)
+
+        matrix_path = os.path.join(out_dir, f"{stock}_loss_matrix.csv")
+        loss_df.to_csv(matrix_path)
+        print(f"\nLoss matrix saved to: {matrix_path}")
+
+        best_pair, best_vals = min(results.items(), key=lambda x: x[1]["total"])
+
+        print("Best learning rates:", best_pair)
+        print("Validation errors:", best_vals)
+
+        best_lrg, best_lrd = best_pair
+        final_results = runOptimizer(best_lrg, best_lrd, X, save_flag=True, epochs=200)
+
+        # unpack final_results
+        generator = final_results["generator"]
+        discriminator = final_results["discriminator"]
+        train_g_loss = final_results["train_g_loss"]
+        train_d_loss = final_results["train_d_loss"]
+        eval_g_loss = final_results["eval_g_loss"]
+        eval_d_loss = final_results["eval_d_loss"]
 
         # file paths
         train_path = os.path.join(out_dir, f"{stock}_train_g_d.csv")

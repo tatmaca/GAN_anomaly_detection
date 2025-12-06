@@ -683,16 +683,22 @@ if __name__ == "__main__":
     dis_ret["return"] = dis_ret_list
     dis_ret["tomorrow_return"] = dis_tomoret_list
 
+    out_dir = f"data_{stock}"
+    dis_ret_path = os.path.join(out_dir, f"{stock}_dis_rets.csv")
+    real_ret_path = os.path.join(out_dir, f"{stock}_real_rets.csv")
+
     model_dir = f"data_{stock}"
     out_path = f"{model_dir}/{stock}_return.png"
+
+    dis_ret["return"].to_csv(dis_ret_path)
+    ret.to_csv(real_ret_path)
 
     ax1 = sns.kdeplot(
         dis_ret["return"].values, linestyle="--", fill=True, label="discrimatedRtn"
     )
     print("PRINTING DISCRIMINATED RETURNS")
-    print(dis_ret["return"].values)
+    print(dis_ret)
     ax2 = sns.kdeplot(ret, label="realRtn")
     plt.legend()
     plt.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close()
-
