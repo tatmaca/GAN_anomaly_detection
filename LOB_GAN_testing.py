@@ -565,8 +565,8 @@ if __name__ == "__main__":
     else:
         minutelyData = prepareMinutelyData(df, tradingDays)
         print("Minutely data generated.")
-    print(f'minute by minute data columns: {minutelyData.columns}')
-    print(minutelyData)
+    # print(f'minute by minute data columns: {minutelyData.columns}')
+    # print(minutelyData)
 
     projdata = []
     columns = [
@@ -672,8 +672,8 @@ if __name__ == "__main__":
     .rename(columns={"lastPx": "price", "dt_index": "index"})
     )
 
-    print(f'price {price.head()}')
-    print(f'test_dataset: {test_dataset}')
+    # print(f'price {price.head()}')
+    # print(f'test_dataset: {test_dataset}')
     #print(f'test_data: {test_data.head()}')
 
     def get_return(x):
@@ -719,18 +719,18 @@ if __name__ == "__main__":
 
 
 
-    print(f"MINUTELY DATA INDEX TYPE: {minutelyData['dt_index'].dtype}")
-    print(f"MINUTELY DATA INDEX: {minutelyData['dt_index']}")
-    print(f'DIS RET INDEX TYPE: {dis_ret.index.dtype}')
-    print(f'DIS RET INDEX: {dis_ret.index}')
+    # print(f"MINUTELY DATA INDEX TYPE: {minutelyData['dt_index'].dtype}")
+    # print(f"MINUTELY DATA INDEX: {minutelyData['dt_index']}")
+    # print(f'DIS RET INDEX TYPE: {dis_ret.index.dtype}')
+    # print(f'DIS RET INDEX: {dis_ret.index}')
 
     merged = minutelyData.merge(dis_ret, left_on='dt_index', right_index=True, how="inner")
     unmerged = minutelyData[~minutelyData['dt_index'].isin(dis_ret.index)]
 
 
     # Save to csvs
-    merged.to_csv(f'./sorted_returns/{stock}_merged_disret', index=False)
-    unmerged.to_csv(f'./sorted_returns/{stock}_unmerged_disret', index=False)
+    merged.to_csv(f'./sorted_returns/{stock}_merged_disret.csv', index=False)
+    unmerged.to_csv(f'./sorted_returns/{stock}_unmerged_disret.csv', index=False)
 
     # print(f'merged: {merged}')
     # print(f'unmerged: {unmerged}')
