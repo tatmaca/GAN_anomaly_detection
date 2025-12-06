@@ -463,10 +463,12 @@ if __name__ == "__main__":
         "--beta1", type=float, default=0.9, help="beta1 rate for LOBGAN"
     )
 
+    parser.add_argument("--tests", type=int, default=3, help="beta1 rate for LOBGAN")
+
     args = parser.parse_args()
 
-    lrgs = np.linspace(args.lrg_d, args.lrg_u, 1)
-    lrds = np.linspace(args.lrd_d, args.lrd_u, 1)
+    lrgs = np.linspace(args.lrg_d, args.lrg_u, args.tests)
+    lrds = np.linspace(args.lrd_d, args.lrd_u, args.tests)
     beta1 = args.beta1
 
     ###Prepare common directory
@@ -932,7 +934,9 @@ if __name__ == "__main__":
         print("Validation errors:", best_vals)
 
         best_lrg, best_lrd = best_pair
-        final_results = runOptimizer(best_lrg, best_lrd, X, save_flag=True, epochs=200)
+        final_results = runOptimizer(
+            best_lrg, best_lrd, beta1, X, save_flag=True, epochs=200
+        )
 
         # unpack final_results
         generator = final_results["generator"]
