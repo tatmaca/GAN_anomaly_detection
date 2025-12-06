@@ -16,6 +16,7 @@ import seaborn as sns
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
+from datetime import datetime
 
 
 class Generator(nn.Module):
@@ -727,10 +728,11 @@ if __name__ == "__main__":
     merged = minutelyData.merge(dis_ret, left_on='dt_index', right_index=True, how="inner")
     unmerged = minutelyData[~minutelyData['dt_index'].isin(dis_ret.index)]
 
+    testing_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Save to csvs
-    merged.to_csv(f'./sorted_returns/{stock}_merged_disret.csv', index=False)
-    unmerged.to_csv(f'./sorted_returns/{stock}_unmerged_disret.csv', index=False)
+    merged.to_csv(f'./sorted_returns/{stock}_merged_disret_{testing_timestamp}.csv', index=False)
+    unmerged.to_csv(f'./sorted_returns/{stock}_unmerged_disret_{testing_timestamp}.csv', index=False)
 
     # print(f'merged: {merged}')
     # print(f'unmerged: {unmerged}')
