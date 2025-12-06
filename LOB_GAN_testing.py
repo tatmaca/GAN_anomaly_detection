@@ -727,8 +727,13 @@ if __name__ == "__main__":
     merged = minutelyData.merge(dis_ret, left_on='dt_index', right_index=True, how="inner")
     unmerged = minutelyData[~minutelyData['dt_index'].isin(dis_ret.index)]
 
-    print(f'merged: {merged}')
-    print(f'unmerged: {unmerged}')
+
+    # Save to csvs
+    merged.to_csv(f'./sorted_returns/{stock}_merged_disret', index=False)
+    unmerged.to_csv(f'./sorted_returns/{stock}_unmerged_disret', index=False)
+
+    # print(f'merged: {merged}')
+    # print(f'unmerged: {unmerged}')
 
 
     model_dir = f"data_{stock}"
