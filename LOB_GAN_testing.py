@@ -728,9 +728,8 @@ if __name__ == "__main__":
     merged = minutelyData.merge(dis_ret, left_on='dt_index', right_index=True, how="inner")
     unmerged = minutelyData[~minutelyData['dt_index'].isin(dis_ret.index)]
 
-    testing_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
     # Save to csvs
+    testing_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     merged.to_csv(f'./sorted_returns/{stock}_merged_disret_{testing_timestamp}.csv', index=False)
     unmerged.to_csv(f'./sorted_returns/{stock}_unmerged_disret_{testing_timestamp}.csv', index=False)
 
