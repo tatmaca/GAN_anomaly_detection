@@ -619,7 +619,6 @@ if __name__ == "__main__":
     projdata = np.array(projdata)
     seq_dt_index = np.array(seq_dt_index)
 
-
     # normalization
     X = projdata[:, :, 5:].astype(float)
 
@@ -725,6 +724,7 @@ if __name__ == "__main__":
     # print(f'DIS RET INDEX TYPE: {dis_ret.index.dtype}')
     # print(f'DIS RET INDEX: {dis_ret.index}')
 
+    #print(f'DIS RET DF: {dis_ret}')
     merged = minutelyData.merge(dis_ret, left_on='dt_index', right_index=True, how="inner")
     unmerged = minutelyData[~minutelyData['dt_index'].isin(dis_ret.index)]
 
