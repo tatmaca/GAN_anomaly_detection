@@ -712,7 +712,7 @@ if __name__ == "__main__":
     dis_ret_list = []
     dis_tomoret_list = []
     for i, data in enumerate(test_dataloader):
-        if discriminator(data) <= 0.5:
+        if discriminator(data) <= 0.2:
             # counter += 1
             index = seq_dt_index[i]
 
@@ -789,8 +789,8 @@ if __name__ == "__main__":
 
     # (optional) save them
     testing_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    merged.to_csv(f'./sorted_returns_for_matt/{stock}_abnormal_minutes_{testing_timestamp}.csv', index=False)
-    unmerged.to_csv(f'./sorted_returns_for_matt/{stock}_normal_minutes_{testing_timestamp}.csv', index=False)
+    merged.to_csv(f'./sorted_returns_for_jordan0056/{stock}_abnormal_minutes_{testing_timestamp}.csv', index=False)
+    unmerged.to_csv(f'./sorted_returns_for_jordan0056/{stock}_normal_minutes_{testing_timestamp}.csv', index=False)
 
 
 
