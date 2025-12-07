@@ -58,13 +58,13 @@ def add_microstructure_features(df: pd.DataFrame) -> pd.DataFrame:
             lambda s: np.log(s.astype(float)).diff()
         )
         df["d_spread"] = df.groupby("date")["spread"].transform(lambda s: s.diff())
-    else:
+    """else:
         # daily: compute diffs across time
         df = df.sort_values(["dt_index"]).copy()
 
         df["trade_ret"] = np.log(df["lastPx"].astype(float)).diff()
         df["mid_ret"] = np.log(df["mid"].astype(float)).diff()
-        df["d_spread"] = df["spread"].diff()
+        df["d_spread"] = df["spread"].diff()"""
 
     df["trade_size"] = df["size"].astype(float)
     # 1-level pressure
