@@ -932,7 +932,9 @@ if __name__ == "__main__":
         print("Validation errors:", best_vals)
 
         best_lrg, best_lrd = best_pair
-        final_results = runOptimizer(best_lrg, best_lrd, X, save_flag=True, epochs=200)
+        final_results = runOptimizer(
+            best_lrg, best_lrd, beta1, X, save_flag=True, epochs=200
+        )
 
         # unpack final_results
         generator = final_results["generator"]
