@@ -666,11 +666,28 @@ if __name__ == "__main__":
     # price = pd.DataFrame(price.reshape((-1, 3)))
     # price.columns = ["date", "price", "index"]
 
+    # price = (
+    # minutelyData
+    # .reset_index()[["date", "lastPx", "dt_index"]]   # dt_index comes from the index
+    # .rename(columns={"lastPx": "price", "dt_index": "index"})
+    # )
+
     price = (
     minutelyData
-    .reset_index()[["date", "lastPx", "dt_index"]]   # dt_index comes from the index
+    .reset_index()[["date", "lastPx", "dt_index"]]
     .rename(columns={"lastPx": "price", "dt_index": "index"})
+    .sort_values(["date", "index"])
     )
+    def daily_return(group):
+        first = group["price"].iloc[0]
+        last = group["price"].iloc[-1]
+        last_idx = group["index"].iloc[-1]   # dt_index of last bar that day
+        return pd.Series({
+            "realRtn": last / first - 1,
+            "dt_index": last_idx,
+        })
+    
+    daily = price.groupby("date").apply(daily_return).reset_index()
 
     # print(f'price {price.head()}')
     # print(f'test_dataset: {test_dataset}')
@@ -679,9 +696,14 @@ if __name__ == "__main__":
     def get_return(x):
         return x.iloc[-1] / x.iloc[0] - 1
 
-    ret = price.groupby(["date", "index"]).apply(get_return)
-    ret.index = ret.index.swaplevel()
-    ret = ret.rename(columns={"price": "realRtn"})
+    #print(f'----PRICE: {price}')
+    # ret = price.groupby(["date", "index"]).apply(get_return)
+    # print(f'------- RET: {ret}')
+    # ret.index = ret.index.swaplevel()
+    # ret = ret.rename(columns={"price": "realRtn"})
+
+    ret = daily.set_index("dt_index")[["realRtn"]]
+    ret.index.name = "dt_index"
 
     # compare "abnormal" quantifiers
     discriminator.eval()
@@ -726,7 +748,15 @@ if __name__ == "__main__":
 
     #print(f'DIS RET DF: {dis_ret}')
     merged = minutelyData.merge(dis_ret, left_on='dt_index', right_index=True, how="inner")
-    unmerged = minutelyData[~minutelyData['dt_index'].isin(dis_ret.index)]
+    #ret_1 = ret.copy()
+    #ret_1.index = ret_1.index.droplevel(1)
+
+    unmerged = minutelyData[~minutelyData['dt_index'].isin(dis_ret.index)].merge(ret, left_on='dt_index', right_index=True, how='inner')
+    #print(f'unmerged: {unmerged}')
+    #print(f'RETS: {ret}')
+    #print(f'PRICE: {price}')
+
+    #print(f'MERGED COLUMNS: {merged.columns}')
 
     # Save to csvs
     testing_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -737,22 +767,16 @@ if __name__ == "__main__":
     # print(f'unmerged: {unmerged}')
 
 
-    out_dir = f"data_{stock}"
-    dis_ret_path = os.path.join(out_dir, f"{stock}_dis_rets.csv")
-    real_ret_path = os.path.join(out_dir, f"{stock}_real_rets.csv")
-
     model_dir = f"data_{stock}"
     out_path = f"{model_dir}/{stock}_return.png"
 
-    dis_ret["return"].to_csv(dis_ret_path)
-    ret.to_csv(real_ret_path)
-
     ax1 = sns.kdeplot(
-        dis_ret["return"].values, linestyle="--", fill=True, label="discrimatedRtn"
+        merged["return"].values, linestyle="--", fill=True, label="discrimatedRtn"
     )
     print("PRINTING DISCRIMINATED RETURNS")
-    print(dis_ret)
-    ax2 = sns.kdeplot(ret, label="realRtn")
+    print(merged["return"].values)
+    ax2 = sns.kdeplot(unmerged, label="realRtn")
     plt.legend()
     plt.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close()
+
