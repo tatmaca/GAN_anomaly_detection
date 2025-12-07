@@ -704,6 +704,7 @@ if __name__ == "__main__":
 
     ret = daily.set_index("dt_index")[["realRtn"]]
     ret.index.name = "dt_index"
+    print(f'RET: {ret}')
 
     # compare "abnormal" quantifiers
     discriminator.eval()
@@ -747,35 +748,78 @@ if __name__ == "__main__":
     # print(f'DIS RET INDEX: {dis_ret.index}')
 
     #print(f'DIS RET DF: {dis_ret}')
-    merged = minutelyData.merge(dis_ret, left_on='dt_index', right_index=True, how="inner")
-    #ret_1 = ret.copy()
-    #ret_1.index = ret_1.index.droplevel(1)
 
-    unmerged = minutelyData[~minutelyData['dt_index'].isin(dis_ret.index)].merge(ret, left_on='dt_index', right_index=True, how='inner')
-    #print(f'unmerged: {unmerged}')
-    #print(f'RETS: {ret}')
-    #print(f'PRICE: {price}')
 
-    #print(f'MERGED COLUMNS: {merged.columns}')
+    # ----------------------------------------
+# Minute-level abnormal vs normal splits
+# ----------------------------------------
 
-    # Save to csvs
+    # 1) Make sure dt_index is a column and is datetime
+    if 'dt_index' not in minutelyData.columns:
+        # if it was the index before
+        minutelyData = minutelyData.reset_index().rename(columns={'index': 'dt_index'})
+
+    minutelyData['dt_index'] = pd.to_datetime(minutelyData['dt_index'])
+
+    # 2) Sort by time just to be safe
+    minutelyData = minutelyData.sort_values('dt_index')
+
+    # 3) Compute minute returns (within each day)
+    #    lastPx_t / lastPx_{t-1} - 1
+    minutelyData['minute_ret'] = (
+        minutelyData
+        .groupby('date')['lastPx']
+        .pct_change()
+    )
+
+    # 4) From dis_index_list (day-end dt_index for abnormal days),
+    #    get the set of abnormal dates
+    dis_dt = pd.to_datetime(dis_index_list)   # list of Timestamps
+    abnormal_dates = set(dis_dt.date)         # Python date objects
+
+    # 5) Tag each minute row as abnormal_day True/False
+    minutelyData['abnormal_day'] = minutelyData['date'].isin(abnormal_dates)
+
+    # 6) Split into:
+    #    - merged: all minutes from abnormal days (with minute_ret)
+    #    - unmerged: all minutes from normal days (with minute_ret)
+    merged = minutelyData[minutelyData['abnormal_day']].copy()
+    print(f'-----MERGED DF: {merged}')
+    unmerged = minutelyData[~minutelyData['abnormal_day']].copy()
+
+    # (optional) save them
     testing_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    merged.to_csv(f'./sorted_returns/{stock}_merged_disret_{testing_timestamp}.csv', index=False)
-    unmerged.to_csv(f'./sorted_returns/{stock}_unmerged_disret_{testing_timestamp}.csv', index=False)
+    merged.to_csv(f'./sorted_returns/{stock}_abnormal_minutes_{testing_timestamp}.csv', index=False)
+    unmerged.to_csv(f'./sorted_returns/{stock}_normal_minutes_{testing_timestamp}.csv', index=False)
 
-    # print(f'merged: {merged}')
+
+
+
+
+    # merged = minutelyData.merge(dis_ret, left_on='dt_index', right_index=True, how="inner")
+
+    # # print(f"----PRE MINUTELYDATA: {minutelyData[~minutelyData['dt_index'].isin(dis_ret.index)]}")
+    # unmerged = minutelyData[~minutelyData['dt_index'].isin(dis_ret.index)].merge(ret, left_on='dt_index', right_index=True, how='inner')
+   
+
+    # # Save to csvs
+    # testing_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # merged.to_csv(f'./sorted_returns/{stock}_merged_disret_{testing_timestamp}.csv', index=False)
+    # unmerged.to_csv(f'./sorted_returns/{stock}_unmerged_disret_{testing_timestamp}.csv', index=False)
+
     # print(f'unmerged: {unmerged}')
+    
 
 
     model_dir = f"data_{stock}"
     out_path = f"{model_dir}/{stock}_return.png"
 
     ax1 = sns.kdeplot(
-        merged["return"].values, linestyle="--", fill=True, label="discrimatedRtn"
+        merged["minute_ret"].values, linestyle="--", fill=True, label="discrimatedRtn"
     )
     print("PRINTING DISCRIMINATED RETURNS")
-    print(merged["return"].values)
-    ax2 = sns.kdeplot(unmerged, label="realRtn")
+    print(merged["minute_ret"].values)
+    ax2 = sns.kdeplot(unmerged['minute_ret'].values, label="realRtn")
     plt.legend()
     plt.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close()
